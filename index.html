@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>retype — type your own code to actually understand it</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2.5' y='2.5' width='27' height='27' rx='7.5' fill='%231d1a28' stroke='%23b478ff' stroke-width='2'/%3E%3Cpath d='M9.5 11 L14.5 16 L9.5 21' stroke='%23b478ff' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Crect x='17.5' y='10.5' width='2.8' height='11' rx='1.4' fill='%23b478ff'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -12,6 +13,11 @@
 <body>
   <header class="topbar">
     <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" width="30" height="30" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2.5" y="2.5" width="27" height="27" rx="7.5" fill="var(--bg-3)" stroke="var(--accent)" stroke-width="2" />
+        <path d="M9.5 11 L14.5 16 L9.5 21" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+        <rect class="logo-caret" x="17.5" y="10.5" width="2.8" height="11" rx="1.4" fill="var(--accent)" />
+      </svg>
       <span class="name">re<span class="accent">type</span></span>
       <span class="tag">type your own code to actually understand it</span>
     </div>

@@ -34,9 +34,11 @@ body {
   border-bottom: 1px solid var(--bg-2);
   flex: 0 0 auto;
 }
-.brand { display: flex; align-items: baseline; gap: 10px; cursor: pointer; user-select: none; }
+.brand { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
 .brand:hover .name { filter: brightness(1.15); }
-.logo { font-size: 22px; }
+.brand:hover .logo { filter: brightness(1.15); }
+.logo { flex: 0 0 auto; display: block; }
+.logo-caret { animation: blink 1s steps(1) infinite; }
 .name { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
 .accent { color: var(--accent); }
 .tag { color: var(--sub); font-size: 13px; margin-left: 6px; }
