@@ -504,6 +504,131 @@ async function pool(items, size, worker) {
   await Promise.all(runners);
 }
 
+/* ========================================================================
+   DEPENDENCY ORDERING
+   Order files so you read a definition before the code that uses it: parse
+   each file's imports, resolve them to other loaded files, and topologically
+   sort (dependency → dependent). Foundational/util files rise to the top;
+   the entry point that wires everything together sinks to the bottom. It's a
+   best-effort heuristic — regex per language, not a real parser — and it
+   falls back to alphabetical for unresolved imports, ties, and cycles.
+   ======================================================================== */
+const stripExt = (p) => p.replace(/\.[^.\/]+$/, "");
+
+// crude per-language import extraction. We only keep specifiers that could
+// resolve to another file in the repo; external packages just won't resolve.
+function rawImports(file) {
+  const src = file.code, out = [];
+  const scan = (re) => { let m; while ((m = re.exec(src))) out.push(m[1]); };
+  switch (file.lang) {
+    case "python":
+      scan(/^\s*from\s+([.\w]+)\s+import\b/gm);
+      scan(/^\s*import\s+([.\w]+)/gm);
+      break;
+    case "javascript": case "jsx": case "typescript": case "tsx":
+      scan(/\bimport\s+[^'"]*?from\s*['"]([^'"]+)['"]/g); // import x from '…'
+      scan(/\bimport\s*['"]([^'"]+)['"]/g);               // side-effect import
+      scan(/\bexport\s+[^'"]*?from\s*['"]([^'"]+)['"]/g); // re-export
+      scan(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g);
+      scan(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g);         // dynamic import
+      break;
+    case "go":
+      scan(/^\s*import\s+(?:\w+\s+)?"([^"]+)"/gm);
+      { const g = /import\s*\(([\s\S]*?)\)/g; let b;         // grouped imports
+        while ((b = g.exec(src))) { const inner = /"([^"]+)"/g; let n;
+          while ((n = inner.exec(b[1]))) out.push(n[1]); } }
+      break;
+    case "java": case "kotlin":
+      scan(/^\s*import\s+(?:static\s+)?([\w.]+)/gm);
+      break;
+    case "c": case "cpp":
+      scan(/^\s*#\s*include\s+"([^"]+)"/gm);                // quoted = local
+      break;
+    case "rust":
+      scan(/^\s*mod\s+(\w+)\s*;/gm);
+      scan(/^\s*use\s+crate::([\w:]+)/gm);
+      break;
+    case "ruby":
+      scan(/\brequire_relative\s+['"]([^'"]+)['"]/g);
+      scan(/\brequire\s+['"]([^'"]+)['"]/g);
+      break;
+    case "php":
+      scan(/\b(?:require|require_once|include|include_once)\s*\(?\s*['"]([^'"]+)['"]/g);
+      break;
+    case "css": case "scss": case "sass": case "less":
+      scan(/@(?:import|use|forward)\s+['"]([^'"]+)['"]/g);
+      break;
+    case "markup":
+      scan(/<script[^>]+src=["']([^"']+)["']/g);
+      scan(/<link[^>]+href=["']([^"']+)["']/g);
+      break;
+  }
+  return out;
+}
+
+// resolve one import specifier to a loaded file (or null). Tries path-style
+// resolution first (relative paths, extensions), then dotted/package modules.
+function resolveImport(spec, fromFile, ix) {
+  const dir = fromFile.path.includes("/") ? fromFile.path.replace(/\/[^/]*$/, "") : "";
+  const norm = (p) => {
+    const a = [];
+    for (const s of p.split("/")) { if (!s || s === ".") continue; s === ".." ? a.pop() : a.push(s); }
+    return a.join("/");
+  };
+  const hit = (p) => p && (ix.byPath.get(p) || ix.byNoExt.get(p) ||
+    ix.byNoExt.get(stripExt(p)) || ix.byNoExt.get(p + "/index") || null);
+  const ext = (spec.match(/\.([a-z0-9]+)$/i) || [])[1];
+  const looksPath = spec.includes("/") || /^[.@~]/.test(spec) || (ext && CODE_EXT.has(ext.toLowerCase()));
+  if (looksPath) {
+    const f = hit(norm((dir ? dir + "/" : "") + spec)) || hit(norm(spec));
+    if (f) return f;
+  }
+  // dotted / :: module path → slashes (python a.b, java a.b.C, rust a::b)
+  const dotted = spec.replace(/^[@~]/, "").replace(/[.:]+/g, "/").replace(/^\/+|\/+$/g, "");
+  if (dotted) {
+    if (ix.byNoExt.has(dotted)) return ix.byNoExt.get(dotted);
+    for (const [p, g] of ix.byNoExt) if (p.endsWith("/" + dotted)) return g;
+    const cands = ix.byBase.get(dotted.split("/").pop());
+    if (cands && cands.length === 1) return cands[0];
+  }
+  return null;
+}
+
+function orderByDependency(files) {
+  if (files.length <= 2) return files.slice();
+  // index files for lookup
+  const ix = { byPath: new Map(), byNoExt: new Map(), byBase: new Map() };
+  for (const f of files) {
+    ix.byPath.set(f.path, f);
+    ix.byNoExt.set(stripExt(f.path), f);
+    const base = stripExt(basename(f.path));
+    (ix.byBase.get(base) || ix.byBase.set(base, []).get(base)).push(f);
+  }
+  // deps: file → set of loaded files it depends on
+  const deps = new Map(files.map((f) => [f, new Set()]));
+  for (const f of files)
+    for (const spec of rawImports(f)) {
+      const t = resolveImport(spec, f, ix);
+      if (t && t !== f) deps.get(f).add(t);
+    }
+  // Kahn's algorithm: emit a file once all its deps are emitted. Among the
+  // ready set, pick the alphabetically-first path (stable, keeps dirs grouped).
+  const cmp = (a, b) => a.path.localeCompare(b.path);
+  const emitted = new Set(), out = [], remaining = new Set(files);
+  while (remaining.size) {
+    let ready = [...remaining].filter((f) => [...deps.get(f)].every((d) => emitted.has(d)));
+    if (ready.length) ready.sort(cmp);
+    else // cycle: break it on the file with the fewest unmet deps, then by path
+      ready = [...remaining].sort((a, b) => {
+        const u = (x) => [...deps.get(x)].filter((d) => remaining.has(d)).length;
+        return u(a) - u(b) || cmp(a, b);
+      });
+    const next = ready[0];
+    out.push(next); emitted.add(next); remaining.delete(next);
+  }
+  return out;
+}
+
 async function loadRepo(input) {
   const info = parseRepoUrl(input);
   if (!info) { setRepoStatus("enter a url like github.com/owner/repo", true); return; }
@@ -554,8 +679,10 @@ async function loadRepo(input) {
       setRepoStatus(`loading files… ${++done}/${blobs.length}`);
     });
 
-    renderFileList();
     if (!app.files.length) throw new Error("files couldn't be loaded");
+    // reorder so definitions come before the code that uses them
+    app.files = orderByDependency(app.files);
+    renderFileList();
     setRepoStatus(`loaded ${app.files.length} file${app.files.length > 1 ? "s" : ""}` +
       (capped ? ` (capped at ${MAX})` : ""));
     selectFile(0);
