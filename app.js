@@ -224,6 +224,8 @@ function startRun() {
       spans: [],
       cursor: 0,
       typed: 0, correct: 0, errors: 0,
+      // total typeable slots is constant; cache it so progOf stays O(1)
+      typeableTotal: slots.reduce((n, s) => n + (s.typeable ? 1 : 0), 0),
       started: null, finished: false, lastLine: -1,
     };
     app.run = run;
@@ -315,15 +317,17 @@ function lineHeightPx() {
 function moveCaret(run, i) {
   const span = run.spans[i], caret = els.caret;
   if (!span || !caret) return;
+  const x = span.offsetLeft, y = span.offsetTop; // read geometry before writing
   const lh = lineHeightPx();
   const pad = lh * 0.14; // inset a touch top & bottom
   caret.style.opacity = "1";
   caret.style.height = (lh - pad * 2) + "px";
-  caret.style.transform = `translate(${span.offsetLeft - 1}px, ${span.offsetTop + pad}px)`;
-  // restart the blink so the caret is solid right after it moves
-  caret.classList.remove("blink");
-  void caret.offsetWidth; // force reflow so the animation actually restarts
-  caret.classList.add("blink");
+  caret.style.transform = `translate(${x - 1}px, ${y + pad}px)`;
+  caret.classList.add("blink"); // idempotent
+  // restart the blink so the caret is solid right after a move — via the Web
+  // Animations API so we don't force a full-document reflow on every keystroke.
+  const anim = caret.getAnimations && caret.getAnimations()[0];
+  if (anim) anim.currentTime = 0;
 }
 function hideCaret() { els.caret.classList.remove("blink"); els.caret.style.opacity = "0"; }
 
@@ -421,9 +425,9 @@ function accOf(run) {
   return run.typed > 0 ? Math.round((run.correct / run.typed) * 100) : 100;
 }
 function progOf(run) {
-  const typeable = run.slots.filter((s) => s.typeable).length || 1;
-  const done = run.status.filter((s) => s === "ok" || s === "err").length;
-  return Math.round((done / typeable) * 100);
+  // run.typed is kept in sync with the ok/err slot count by commit/backspace,
+  // so it already equals "done" — no need to rescan the arrays each keystroke.
+  return Math.round((run.typed / (run.typeableTotal || 1)) * 100);
 }
 function updateHud(run) {
   const prog = progOf(run);
