@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>retype — type your own code to actually understand it</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="name">re<span class="accent">type</span></span>
+      <span class="tag">type your own code to actually understand it</span>
+    </div>
+    <div class="topbar-actions">
+      <button id="btn-sidebar" class="ghost small" title="Toggle file list" aria-label="Toggle file list">☰ files</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <span>files</span>
+        <span id="file-count" class="muted">0</span>
+      </div>
+      <ul class="filelist" id="filelist"></ul>
+    </aside>
+
+    <section class="stage">
+      <div class="hud" id="hud">
+        <div class="hud-item"><span class="hud-val" id="wpm">0</span><span class="hud-lbl">wpm</span></div>
+        <div class="hud-item"><span class="hud-val" id="acc">100%</span><span class="hud-lbl">acc</span></div>
+        <div class="hud-item"><span class="hud-val" id="prog">0%</span><span class="hud-lbl">done</span></div>
+        <div class="hud-file" id="hud-file"></div>
+        <button id="btn-restart" class="ghost small" title="Restart (Tab or Esc)" hidden>↻ restart</button>
+      </div>
+
+      <div class="progbar" id="progbar"><div class="progbar-fill" id="progbar-fill"></div></div>
+
+      <div class="typer-wrap" id="typer-wrap" tabindex="0">
+        <div class="caret" id="caret"></div>
+        <pre class="typer" id="typer" aria-label="Type the code shown"></pre>
+        <div class="placeholder" id="placeholder">
+          <div class="landing">
+            <h1 class="landing-title">type your own code to <span class="accent">actually understand it</span></h1>
+            <p class="landing-sub">Load a codebase, then type through it file by file. Comments stay on screen for context — you only type the real code.</p>
+            <div class="options">
+              <div class="option-card">
+                <div class="opt-h">GitHub repo</div>
+                <div class="opt-d">Paste a public repo URL. Every code file is loaded so you can type the whole project.</div>
+                <form class="repo-row" id="repo-form">
+                  <input id="repo-url" type="text" placeholder="github.com/owner/repo" autocomplete="off" spellcheck="false" />
+                  <button type="submit" id="btn-repo" class="primary">Load →</button>
+                </form>
+                <div class="repo-status" id="repo-status"></div>
+              </div>
+              <div class="option-card">
+                <div class="opt-h">Try a sample</div>
+                <div class="opt-d">A small quicksort in Python to feel out how it works.</div>
+                <button id="btn-sample" class="primary block">Load sample →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="results" id="results" hidden>
+        <div class="results-card">
+          <h2>done <span id="r-file"></span></h2>
+          <div class="results-grid">
+            <div><span class="r-val" id="r-wpm">0</span><span class="r-lbl">wpm</span></div>
+            <div><span class="r-val" id="r-acc">0%</span><span class="r-lbl">accuracy</span></div>
+            <div><span class="r-val" id="r-time">0s</span><span class="r-lbl">time</span></div>
+            <div><span class="r-val" id="r-chars">0</span><span class="r-lbl">chars</span></div>
+            <div><span class="r-val" id="r-errs">0</span><span class="r-lbl">errors</span></div>
+          </div>
+          <div class="results-actions">
+            <button id="r-next" class="primary">next file (Enter) →</button>
+            <button id="r-again" class="ghost">retype</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Prism for per-character syntax highlighting -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

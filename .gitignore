@@ -1,0 +1,18 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Node (in case tooling is ever added)
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Local Claude Code overrides
+.claude/settings.local.json
